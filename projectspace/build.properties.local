@@ -1,0 +1,30 @@
+# build.properties
+#
+# Defines parameters for the ant deployment script - see the readme for details
+#
+# NB this file is not tracked. I strongly recommend that you create a copy and
+# keep it locally to be reused in different branches.
+
+# Your orgs
+dev.username = ranjeet.singh1@appirio.com.wubs.comhub
+dev.password = appirio#123gMFu8dhItEMADUhA8JxOQD31B
+dev.endpoint = noNeed
+dev.url      = https://test.salesforce.com
+
+qa.username = ranjeet.singh1@appirio.com.partialsb
+qa.password = appirio#123gMFu8dhItEMADUhA8JxOQD31B
+qa.endpoint = noNeed
+qa.url      = https://test.salesforce.com
+
+# Config options
+sf.maxPoll      = 50
+sf.pollWait     = 20000
+
+# Git repository
+git.master      = develop
+git.url         = ssh://git@github.com:WubsDev/TestIntegration.git
+
+# You probably shouldn't change the following options
+src.dir         = src
+temp.dir        = deployments/temp
+lib.dir         = deployments

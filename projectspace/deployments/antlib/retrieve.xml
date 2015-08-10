@@ -1,0 +1,69 @@
+<?xml version="1.0"?>
+<project
+    name     = "retrieve"
+    basedir  = "."
+    xmlns:sf = "antlib:com.salesforce">
+
+  <import file = "shared.xml"/>
+  <import file = "folders.xml"/>
+
+  <!--
+      This file includes internal targets for retrievals from salesforce, to be
+      included in build.xml
+  -->
+
+  <target name    = "retrieve"
+          depends = "shared.cleanup,folders.buildFoldersPackage">
+    <chooseRetrieval/>
+    <antcall target = "removeNamespaceComponents"/>     
+  </target>
+
+
+  <scriptdef name     = "chooseRetrieval"
+	     language = "javascript"
+		 manager  = "javax"
+	     src = "${lib.dir}/script/chooseretrieval.js">
+  </scriptdef>
+
+
+  <target name    = "buildFilesManifest">
+    <fileListToXML input        = "${filesList}"
+			  xmlproperty  = "filesXML"
+			  listproperty = ""/>
+    <writeManifestFile filepath = "${lib.dir}/manifest/files.xml"
+			      body     = "${filesXML}"/>
+  </target>
+
+  <target name = "removeNamespaceComponents">
+    <!-- removes any namespaced components from the objects -->
+    <exec executable = "perl">
+      <arg value = "-i.bak"/>
+      <arg value = "-0pe"/>
+      <arg value = "s/&lt;(\\w+)&gt;\\s+&lt;fullName&gt;[\\w]*__(r(?!\\.)|[^r])\\w+&lt;\\/fullName&gt;(.|\\n)*?&lt;\\/\\1&gt;\\s+//mg"/>
+      <arg value = "${src.dir}/objects/*.object"/>
+    </exec>
+	
+    <!-- removes ContentVersion, socialpost and feedItem from profiles -->
+    <exec executable = "perl">
+      <arg value = "-i.bak" />
+      <arg value = "-0pe" />
+      <arg value = "s/\\s+&lt;layoutAssignments&gt;\\s+&lt;layout&gt;SocialPost-Social Post Layout&lt;\\/layout&gt;\s+&lt;\\/layoutAssignments&gt;//; s/&lt;default&gt;false(&lt;\\/default&gt;\\s+&lt;recordType&gt;ContentVersion.Americas_Sales_Operations_Library&lt;\\/recordType&gt;)/&lt;default&gt;true\\1/;
+	  s/\\s*&lt;layoutAssignments&gt;\\s*&lt;layout&gt;FeedItem-Feed Item Layout&lt;\\/layout&gt;\s*&lt;\\/layoutAssignments&gt;//" />
+      <arg value = "${src.dir}/profiles/*.profile"/>
+    </exec>
+	
+    <!-- removes ContentVersion and socialpost from permissionsets -->
+    <exec executable = "perl">
+      <arg value = "-i.bak" />
+      <arg value = "-0pe" />
+      <arg value = "s/\\s+&lt;layoutAssignments&gt;\\s+&lt;layout&gt;SocialPost-Social Post Layout&lt;\\/layout&gt;\s+&lt;\\/layoutAssignments&gt;//; s/&lt;default&gt;false(&lt;\\/default&gt;\\s+&lt;recordType&gt;ContentVersion.Americas_Sales_Operations_Library&lt;\\/recordType&gt;)/&lt;default&gt;true\\1/" />
+      <arg value = "${src.dir}/permissionsets/*.permissionset"/>
+    </exec>
+	
+    <!-- removes backups resulting from the prior commands -->
+    <exec executable = "rm">
+      <arg value = "${src.dir}/*/*.bak"/>
+    </exec>
+  </target>
+
+</project>

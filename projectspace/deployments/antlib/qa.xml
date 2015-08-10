@@ -1,0 +1,116 @@
+<?xml version="1.0"?>
+<project name     = "qa"
+	 xmlns:sf = "antlib:com.salesforce">
+
+  <condition property = "needsQAmerge">
+    <or>
+      <contains string    = "${username}"
+		substring = ".qa" />
+      <contains string    = "${username}"
+		substring = ".spqa" />
+    </or>
+  </condition>
+
+  <target name  = "gitHardReset"
+	  if = "needsQAmerge">
+    <antcall target = "datalossconfirm" />
+	<exec executable = "git">
+	  <arg value = "reset"/>
+	  <arg value = "--hard"/>
+	</exec>
+  </target>
+
+  <target name    = "merge" 
+          if      = "needsQAmerge">
+    <echo message = "Preparing to deploy ${currentbranch} to QA"/>  
+    <echo message = "This operation will delete uncommitted changes." />
+    <qa.delete/>
+    <exec executable = "git" >
+      <arg value = "checkout"/>
+      <arg value = "--force"/>
+      <arg value = "--track"/>
+      <arg value = "origin/QA"/>
+    </exec>
+    <property name = "force"
+	      value = "" />
+    <exec executable    = "git"
+          failonerror   = "true">
+      <arg value = "merge"/>
+      <arg value = "${force}" />
+      <arg value = "-Xignore-space-change"/>
+      <arg value = "${currentbranch}"/>
+    </exec>
+  </target>
+
+
+  <macrodef name = "qa.delete">
+    <sequential>
+      <exec executable = "git">
+	<arg value = "branch"/>
+	<arg value = "-D"/>
+	<arg value = "QA"/>
+      </exec>
+    </sequential>
+  </macrodef>
+
+
+  <macrodef name = "qa.branch">
+    <sequential>
+      <exec executable = "git">
+	<arg value = "checkout"/>
+	<arg value = "QA"/>
+      </exec>
+    </sequential>
+  </macrodef>
+
+
+  <target name = "debranch"
+          if   = "needsQAmerge">
+    <exec executable = "git">
+      <arg value = "reset"/>
+      <arg value = "--hard"/>
+    </exec>
+    <exec executable = "git">
+      <arg value = "checkout"/>
+      <arg value = "${currentbranch}"/>
+    </exec>
+  </target>
+
+
+  <target name = "push"
+	  unless = "v" >
+    <qa.branch/>
+    <exec executable = "git">
+      <arg value = "pull"/>
+      <arg value = "origin"/>
+	  <arg value = "QA"/>
+    </exec>
+    <exec executable = "git">
+      <arg value = "push"/>
+      <arg value = "origin"/>
+      <arg value = "QA"/>
+    </exec>
+    <antcall target = "debranch"/>
+  </target>
+
+
+  <target name   = "finish"
+          if     = "needsQAmerge">
+    <antcall target= "push"/>
+    <qa.delete/>
+  </target>
+
+
+  <target name   = "datalossconfirm"
+	  unless = "nowarn">
+    <input message   = "Continue? (Set nowarn to true to bypass this message)"
+           validargs   = "y,n"
+           addproperty = "QAmerge.confirm"/>
+    <condition property = "QAmerge.abort">
+      <equals arg1 = "n"
+	      arg2 = "${QAmerge.confirm}"/>
+    </condition>
+    <fail if="QAmerge.abort">Build aborted.</fail>
+  </target>
+
+</project>

@@ -1,0 +1,71 @@
+<?xml version = '1.0'?>
+<project name       = "git/SFDC integration"
+         default    = "help"
+         basedir    = "."
+         xmlns:sf   = "antlib:com.salesforce">
+  
+  <!--
+      SETUP
+      Import properties file, initialise filenames and executable paths, and
+      set username, password, and url based on whether the -t flag is set.
+  -->
+  
+  <property file = "build.properties.local"/>
+  <property file = "${user.home}/.ant.salesforce.properties"/>
+
+  <import file = "${lib.dir}/antlib/shared.xml"/>
+  <import file = "${lib.dir}/antlib/retrieve.xml"/>
+  <import file = "${lib.dir}/antlib/deploy.xml"/>
+  <import file = "${lib.dir}/antlib/folders.xml"/>
+  <import file = "${lib.dir}/antlib/delete.xml"/>
+  <import file = "${lib.dir}/antlib/test.xml"/>
+
+  <condition property = "windows">
+    <os family = "windows"/>
+  </condition>
+  
+  <condition property = "sed"
+             value    = "gsed"
+             else     = "sed">
+    <os family  = "mac"/>
+  </condition>
+
+  <mkdir dir = "${temp.dir}" />
+  
+  <!--
+      EXTERNAL TARGETS
+  -->
+
+  <target name = "delete"
+	  depends = "delete.writeDestructiveChanges,delete.deployDestructiveChanges"/>
+
+  <target name = "test"
+	  depends = "test.testlist2xml"/>
+
+
+  <target name = "filter"
+	  depends = "shared.checkQuery">
+    <antcall target = "shared.doFilteredPatch" />
+    <echo>Your filtered changes are now in your working copy. Please check, stage, and commit them.</echo>
+    <input>When you have finished committing your changes, press ENTER to continue.</input>
+    <antcall target = "shared.resetWorkingCopy" />
+  </target>
+
+  <target name = "help">
+    <echo>
+      ant/git integration tools for Salesforce.com
+      --------------------------------------------
+
+      Available commands:
+      - help
+      - retrieve -De={env} [-Da=1|-Df={files}|-Dtype={type}]
+      - deploy -De={env} [-Da=1|-Df={files}|-Dh={number}] [-Dv=1] [-Dt=1]
+      - filter -Dq={query}
+      - delete [-Deploy=1 -De={env} [-Dv=1]]
+      - test
+
+      See readme.md for more information.
+    </echo>
+  </target>
+
+</project>

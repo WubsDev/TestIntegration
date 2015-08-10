@@ -1,0 +1,201 @@
+<?xml version="1.0"?>
+<project name     = "deploy"
+	 xmlns:sf = "antlib:com.salesforce">
+  <!--
+      This file contains internal targets for ant deployments to be
+      included in build.xml (they are in a separate file in order to
+      control the file size).
+  -->
+
+  <import file = "shared.xml"/>
+  <import file = "folders.xml"/>
+  <import file = "qa.xml"/>
+
+  <property name  = "includesFile" 
+            value = "${temp.dir}/includes"/>
+  <property name  = "zipFile" 
+            value = "${temp.dir}/data"/>
+
+
+  <target name = "deploy"
+          depends = "shared.cleanup,
+		     shared.checkMergeStatus">    
+    <!-- 
+	 prepare 
+    -->
+    <setEnvironment/>
+	<antcall target = "qa.gitHardReset"/>
+    <prepareFileList/>
+    
+    <!-- if we're deploying to QA, we need to fetch the most up-to-date copy -->
+    <exec executable = "git"
+          outputproperty = "currentbranch">
+      <arg value = "rev-parse"/>
+      <arg value = "--abbrev-ref"/>
+      <arg value = "HEAD"/>
+    </exec>
+
+    <antcall target = "qa.merge"/>
+
+    <loadfile property = "includes"
+	      srcfile = "${includesFile}"
+	      failonerror = "false"/>
+    
+    <exec executable    = "sed"
+          inputstring   = "${includes}"
+          outputproperty= "includesFiltered">
+      <arg value = "-r"/>
+      <arg value = "'s/.*src\/(.*)/\1/'"/>
+    </exec>
+    
+    <!--
+	create the zip file
+    -->
+    
+    <!-- prepare the file list and xml content -->
+    <fileListToXML input        = "${includesFiltered}"
+		   xmlproperty  = "xml"
+		   listproperty = "filelist"/>
+    <echo message = "${filelist}"
+	  output  = "${includesFile}"/>
+    <echo message = "package.xml"
+	  output  = "${includesFile}"
+	  append  = "true"/>
+    <writeManifestFile filepath = "${src.dir}/package.xml"
+		       body     = "${xml}" />
+
+    <!-- rewrite castiron endpoints -->
+    <exec executable = "perl"
+	  failonerror = "true">
+      <arg value = "-i.bak" />
+      <arg value = "-pe" />
+      <arg value = "s/&lt;endpointUrl&gt;https:\\/\\/.*\\.sophos\\.com/&lt;endpointUrl&gt;https:\\/\\/${endpoint}/"/>
+      <arg value = "${src.dir}/workflows/*.workflow"/>
+    </exec>
+
+    <!-- create the zip files -->
+    <antcall target = "pause" />
+    <zip destfile       = "${zipFile}.zip"
+	 basedir        = "${src.dir}/"
+	 includesfile   = "${includesFile}"/>
+    
+    <!-- switch back to the main branch -->
+    <antcall target = "qa.debranch" />
+    
+    <!--
+	do the actual deployment
+    -->
+
+    <exec executable = "sh"
+	  outputproperty = "startTime">
+      <arg value = "-c"/>
+      <arg value = "date +%Y:%m:%d:%T:%z"/>
+    </exec>
+
+    <exec executable = "grep"
+	  outputproperty = "grepoutput">
+      <arg value = "-lEr"/>
+      <arg value = "is[tT]est|test[mM]ethod"/>
+      <arg value = "src/classes/"/>
+    </exec>
+    <chooseDeployment/>
+    <antcall target = "qa.finish"/>
+    <antcall target = "logDeployment"/>
+  </target>
+
+
+  <scriptdef name     = "chooseDeployment"
+             language = "javascript"
+			 manager  = "javax"
+			 src      = "${lib.dir}/script/deploy.js"/>
+
+
+  <scriptdef name = "prepareFileList"
+		manager = "javax"
+	     language = "javascript">
+    if (project.getProperty("a")) {     
+          project.executeTarget("listAllFiles")
+    } else if (project.getProperty("f")) {
+          project.setProperty("includes",project.getProperty("f").replace(/[;,]/g,"\n"))
+    } else if (project.getProperty("h")) {
+          project.executeTarget("listRecentlyChangedFiles")
+    } else {
+          project.executeTarget("listAllChangedFiles");
+    }
+  </scriptdef>
+
+
+  <target name = "pause"
+	  if   = "pause">
+    <input>Pause</input>
+  </target>
+
+
+  <!-- GIT INTEGRATION -->
+
+  <target name    = "listAllFiles">
+    <!-- List all salesforce files  -->
+    <condition property = "find"
+               value    = "${lib.dir}/find.exe">
+      <isset property = "windows" />
+    </condition>
+    <property name  = "find"
+              value = "find"/>
+
+    <exec executable     = "${find}"
+          failonerror    = "true"
+          output = "${includesFile}">
+      <arg value = "src"/>
+      <arg value = "-type"/>
+      <arg value="f"/>
+    </exec>
+  </target>
+
+
+  <target name    = "listRecentlyChangedFiles">
+    <!-- If h is set, list files changed since the h-th last commit -->
+    <exec executable     = "git"
+          failonerror    = "true"
+	  output = "${includesFile}">
+      <arg value = "diff"         />
+      <arg value = "--name-only"  />
+      <arg value = "--relative"   />
+      <arg value = "HEAD~${h}"    />
+    </exec> 
+  </target>
+
+
+  <target name    = "listAllChangedFiles">
+    <!-- List files which differ between here and the master branch -->
+    <exec executable     = "git"
+          failonerror    = "true"
+          output = "${includesFile}">
+      <arg value = "diff"         />
+      <arg value = "--name-only"  />
+      <arg value = "--diff-filter=AMR"   />
+      <arg value = "--relative"   />
+      <arg value = "origin/${git.master}"/>
+	  <arg value = "HEAD" />
+      <arg value = "src/"/>
+    </exec>
+  </target>
+
+  <target name   = "logDeployment"
+	  unless = "v">
+    <property name = "delete"
+	      value = ""/>
+
+    <exec executable = "jjs">
+      <arg value = "-scripting"/>
+      <arg value = "${lib.dir}/script/logDeployment.js"/>
+      <arg value = "--"/>
+      <arg value = "${HEAD}"/>
+      <arg value = "${startTime}"/>
+      <arg value = "${url}"/>
+      <arg value = "${username}"/>
+      <arg value = "${password}"/>
+      <arg value = "${delete}"/>
+    </exec>
+  </target>
+
+</project>

@@ -1,0 +1,59 @@
+<?xml version="1.0"?>
+<project
+    name     = "delete"
+    xmlns:sf = "antlib:com.salesforce">
+  <import file = "shared.xml"/>
+  <import file = "deploy.xml"/>
+
+  <target name="writeDestructiveChanges"
+	  depends = "shared.checkMergeStatus"
+	  unless = "eploy">
+
+    <property name = "delete"
+	      value = "true"/>
+
+    <property name = "branch"
+	      value = "origin/${git.master}"/>
+
+    <exec executable = "jjs"
+	  outputProperty = "delIncludes">
+      <arg value = "-scripting"/>
+      <arg value = "${lib.dir}/script/listDeletions.js"/>
+      <arg value = "--"/>
+      <arg value = "${branch}"/>
+    </exec>
+
+    <exec executable    = "sed"
+          inputstring   = "${delIncludes}"
+          outputproperty= "includesFiltered">
+      <arg value = "-r"/>
+      <arg value = "'s/.*src\/(.*)/\1/'"/>
+    </exec>
+
+    <fileListToXML input        = "${includesFiltered}"
+		   xmlproperty  = "xml"
+		   listproperty = ""/>
+		   
+    <writeManifestFile filepath = "${lib.dir}/manifest/destructiveChanges.xml"
+		       body     = "${xml}" />
+			   
+    <writeManifestFile filepath = "${lib.dir}/manifest/package.xml"
+		       body     = "" />  
+			   
+    <zip destfile = "${zipFile}.zip" 
+	 basedir = "${lib.dir}/manifest/"
+	 includes = "package.xml,destructiveChanges.xml"/>
+	 
+  </target>
+
+
+  <target name = "deployDestructiveChanges"
+	  if = "eploy">
+    <!--"eploy" so that you can call ant delete -Deploy=1:
+	sad, but it makes me happy-->
+    <setEnvironment/>
+    <chooseDeployment/>
+    <antcall target = "deploy.logDeployment"/>
+  </target>
+
+</project>

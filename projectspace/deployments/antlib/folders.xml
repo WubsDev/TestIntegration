@@ -1,0 +1,116 @@
+<?xml version="1.0"?>
+<project
+    name     = "folders"
+    xmlns:sf = "antlib:com.salesforce">
+
+  <import file = "shared.xml"/>
+
+  <!--
+      Defines ant tasks for the manipulation of metadata which belongs in folders,
+      viz. EmailTemplates, Documents, and Reports.
+      Only the folders listed herein will be indexed, which means in particular
+      that if a new folder is required it ought to be added in this file.
+  -->
+
+  <target name="setSortPath"
+          if = "windows">
+    <property name="sort"
+              location = "${lib.dir}/sort.exe"/>
+  </target>
+
+
+  <target name    ="buildFoldersPackage"
+          depends = "setSortPath">
+    <setEnvironment/>
+    <!-- uses multithreading because waiting for a SOAP reply doesn't consume
+	 any CPU. Lots of hardcoding of folder names because there isn't really
+	 any prettier way to achieve this -->    
+    <parallel>
+      <sequential>
+	<parallel>
+          <describe metadata  = "EmailTemplate"   folder    = "Asset"/>
+          <describe metadata  = "EmailTemplate"   folder    = "Conga_Templates"/>
+          <describe metadata  = "EmailTemplate"   folder    = "Contact_User"/>
+          <describe metadata  = "EmailTemplate"   folder    = "Error_Reporting"/>
+          <describe metadata  = "EmailTemplate"   folder    = "Marketing_Templates"/>
+          <describe metadata  = "EmailTemplate"   folder    = "NEEMEA_Sales"/>
+          <describe metadata  = "EmailTemplate"   folder    = "Partner_Templates"/>
+          <describe metadata  = "EmailTemplate"   folder    = "Sales_NA_NSG_Renewal_Templates"/>
+          <describe metadata  = "EmailTemplate"   folder    = "Sales_Templates"/>
+          <describe metadata  = "EmailTemplate"   folder    = "StatusReportEmails"/>
+          <describe metadata  = "EmailTemplate"   folder    = "Support_Templates"/>
+          <describe metadata  = "EmailTemplate"   folder    = "UTM_DACH"/>
+	</parallel>
+      </sequential>
+      
+      <sequential>
+	<parallel>
+          <describe metadata  = "Report"          folder    = "Conga_PointMerge_Reports"/>
+          <describe metadata  = "Report"          folder    = "Conga_Reports"/>
+	</parallel>
+      </sequential>
+      
+      <sequential>
+	<parallel>
+          <describe metadata  = "Document"        folder    = "Apps"/>
+          <describe metadata  = "Document"        folder    = "Developer_Documents"/>
+          <describe metadata  = "Document"        folder    = "Documents"/>
+          <describe metadata  = "Document"        folder    = "Invoices"/>
+          <describe metadata  = "Document"        folder    = "Lead_Images"/>
+          <describe metadata  = "Document"        folder    = "Logos"/>
+          <describe metadata  = "Document"        folder    = "Partner_Portal_Branding"/>
+          <describe metadata  = "Document"        folder    = "SharedDocuments"/>
+          <describe metadata  = "Document"        folder    = "Tab_Images"/>
+	</parallel>
+      </sequential>
+    </parallel>
+
+    <folderList   metadata = "Report"           metaFolderName = "reports" />
+    <folderList   metadata = "Document"         metaFolderName = "documents" />
+    <folderList   metadata = "EmailTemplate"    metaFolderName = "email" />
+    
+    <!--
+	build folders.xml manifest
+    -->
+    <loadfile property  = "folderlist"
+              srcfile   = "${temp.dir}/folders.list"/>
+    <fileListToXML input        = "${folderlist}"
+			  xmlproperty  = "folderxml"
+			  listproperty = ""/>
+    <writeManifestFile filepath = "${lib.dir}/manifest/folders.xml"
+			      body     = "${folderxml}"/>
+  </target>
+
+
+  <macrodef name = "describe">
+    <!-- call sf:listMetadata for the associated type and folder -->
+    <attribute name = "metadata"/>
+    <attribute name = "folder"/>
+    <sequential>
+      <mkdir dir = "${temp.dir}/@{metadata}"/>
+      <sf:listMetadata username       = "${username}"
+                       password       = "${password}"
+                       serverurl      = "${url}"
+                       metadataType   = "@{metadata}"
+                       folder         = "@{folder}"
+                       resultFilePath = "${temp.dir}/@{metadata}/@{folder}"/>
+    </sequential>
+  </macrodef>
+
+
+  <macrodef name = "folderList">
+    <!-- turn listMetadata response into chunks of manifest file -->
+    <attribute name = "metadata"/>
+    <attribute name = "metaFolderName"/>
+    <sequential>
+      <apply executable   = "${sed}"
+             output       = "${temp.dir}/folders.list"
+             append       = "true">
+	<!-- get list of files from listMetadata response file contents-->
+	<fileset dir = "${temp.dir}/@{metadata}"/>
+	<arg value = "/FileName: @{metaFolderName}\//!d; s//@{metaFolderName}\//"/>
+      </apply>
+    </sequential>
+  </macrodef>
+
+</project>

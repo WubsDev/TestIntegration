@@ -1,0 +1,158 @@
+<?xml version="1.0"?>
+<project
+    name     = "shared"
+    xmlns:sf = "antlib:com.salesforce">
+
+  <macrodef name="writeManifestFile">
+    <attribute name = "filepath"/>
+    <attribute name = "body"/>
+    <sequential>
+      <echo message   = "&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;&#10;
+			 &lt;Package xmlns=&quot;http://soap.sforce.com/2006/04/metadata&quot;&gt;&#10;
+			 @{body}&#10;
+			 &lt;version&gt;30.0&lt;/version&gt;&lt;/Package&gt;"
+            file      = "@{filepath}"
+            append    = "false"/>
+    </sequential>
+  </macrodef>
+
+
+  <scriptdef name = "fileListToXML" 
+             language = "javascript"
+			 manager  = "javax"
+             src = "${lib.dir}/script/list2xml.js">
+    <!--
+	Takes a newline-delimited list of files and produces two outputs;
+	- an xml string with a <types> pair for each metadata type with the
+	appropriate type <name> element and <members> elements for each folder
+	and file.
+	- a comma-delimited list of each file, with associated meta file, and
+	a meta file for each folder.
+    -->
+    <attribute name = "input"/>
+    <attribute name = "xmlproperty"/>
+    <attribute name = "listproperty"/>
+  </scriptdef>
+
+
+  <target name = "doFilteredPatch">
+    <echo>Generating patch file</echo>
+    <exec executable = "perl"
+	  output     = "${temp.dir}/patch"
+	  logError   = "true"
+	  failonerror = "true">
+      <arg value = "${lib.dir}/script/patchgen.pl"/>
+      <arg value = "${q}"/>
+      <arg value = "${dir}"/>
+    </exec>
+
+    <echo>Stashing changes</echo>
+    <exec executable = "git">
+      <arg value = "stash"/>
+    </exec>
+
+    <echo>Applying patch</echo>
+    <exec executable = "git">
+      <arg value = "apply" />
+      <arg value = "--ignore-space-change" />
+      <arg value = "--whitespace=fix" />
+      <arg value = "--recount" />
+      <arg value = "--reject" />
+      <arg value = "-C2" />
+      <arg value = "${temp.dir}/patch" />
+    </exec>
+
+    <exec executable = "git">
+      <arg value = "add"/>
+      <arg value = "-u"/>
+    </exec> 
+  </target>
+
+
+  <target name = "checkQuery"
+	  unless = "q">
+    <fail>You need to enter a search term with -Dq=[query] and a direction with -Ddir="[+|-]"</fail>
+  </target>
+
+
+  <target name = "resetWorkingCopy">
+    <echo>Resetting uncommitted changes</echo>
+    <exec executable = "git">
+      <arg value = "reset"/>
+      <arg value = "--hard"/>
+    </exec>
+
+    <echo>Reapplying original state</echo>
+    <exec executable = "git">
+      <arg value = "merge"/>
+      <arg value = "--squash"/>
+      <arg value = "stash"/>
+    </exec>
+
+    <echo>Resetting staged changes</echo>
+    <exec executable = "git">
+      <arg value = "reset"/>
+    </exec>
+
+  </target>
+
+
+  <target name = "checkMergeStatus">
+    <exec executable = "git"
+	  outputproperty = "HEAD">
+      <arg value = "rev-parse"/>
+      <arg value = "origin/${git.master}"/>
+    </exec>
+
+    <exec executable = "git"
+	  outputproperty = "log">
+      <arg value = "log"/>
+      <arg value = "--format=format:%H"/>
+    </exec>
+
+    <script language = "javascript">
+      <![CDATA[
+	       if(log.indexOf(HEAD) == -1){
+	       fail = project.createTask("fail");
+	       fail.setMessage(project.getProperty("git.master") + " is not fully merged!");
+	       fail.execute();
+	       }
+      ]]>
+    </script>
+
+  </target>
+  
+
+  <!-- CLEANUP -->
+
+  <target name = "cleanup">
+    <delete>
+      <fileset dir="${temp.dir}"/>
+    </delete>
+  </target>
+
+
+  <scriptdef name = "setEnvironment"
+	     language = "javascript">
+    <![CDATA[
+	 (function(e) {
+	   username = project.getProperty(e+".username");
+	   endpoint = project.getProperty(e+".endpoint");
+	   password = project.getProperty(e+".password");
+	   url      = project.getProperty(e+".url");
+
+           if ( username && endpoint && password && url) {
+	     project.setProperty("username", username);
+	     project.setProperty("endpoint", endpoint.replace("https://", ''));
+	     project.setProperty("password", password);
+	     project.setProperty("url", url);
+	   } else {
+	     fail = project.createTask("fail");
+	     fail.setMessage("Either you didn't specify an environment, or the specified environment didn't have the correct properties defined in build.properties.local.");
+	     fail.execute();
+	   }
+	 }(project.getProperty("e")))
+    ]]>
+  </scriptdef>
+
+</project>

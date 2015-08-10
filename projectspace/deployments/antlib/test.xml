@@ -1,0 +1,65 @@
+<?xml version="1.0"?>
+<project name     = "test"
+	xmlns:sf = "antlib:com.salesforce">
+
+	<import file = "shared.xml"/>
+
+	<target name = "testlist2xml">
+		<echo>Empty input test</echo>
+		<testlist2xml input = ""
+			outputXML=""
+			outputList=""/>
+
+		<echo>Meta file test</echo>
+		<testlist2xml input = "classes/Test.cls-meta.xml"
+			outputXML="&lt;types&gt;&lt;name&gt;ApexClass&lt;/name&gt;&lt;members&gt;Test&lt;/members&gt;&#10;&lt;/types&gt;"
+			outputList="classes/Test.cls&#10;classes/Test.cls-meta.xml&#10;"/>
+
+		<echo>Single Class test</echo>
+		<testlist2xml input = "classes/Test.cls"
+			outputXML="&lt;types&gt;&lt;name&gt;ApexClass&lt;/name&gt;&lt;members&gt;Test&lt;/members&gt;&#10;&lt;/types&gt;"
+			outputList="classes/Test.cls&#10;classes/Test.cls-meta.xml&#10;"/>
+
+		<echo>Single Object test</echo>
+		<testlist2xml input = "objects/Test.object"
+			outputXML="&lt;types&gt;&lt;name&gt;CustomObject&lt;/name&gt;&lt;members&gt;Test&lt;/members&gt;&#10;&lt;/types&gt;"
+			outputList="objects/Test.object&#10;"/>
+
+		<echo>Single Folder test</echo>
+		<testlist2xml input = "documents/Logos/sage.jpg"
+			outputXML="&lt;types&gt;&lt;name&gt;Document&lt;/name&gt;&lt;members&gt;Logos&lt;/members&gt;&#10;&lt;members&gt;Logos/sage&lt;/members&gt;&#10;&lt;/types&gt;"
+			outputList="documents/Logos-meta.xml&#10;documents/Logos/sage.jpg&#10;documents/Logos/sage.jpg-meta.xml&#10;"/>
+
+		<echo>Folder and Class test</echo>
+		<testlist2xml input = "documents/Logos/sage.jpg&#10;classes/Test.cls"
+			outputXML="&lt;types&gt;&lt;name&gt;Document&lt;/name&gt;&lt;members&gt;Logos&lt;/members&gt;&#10;&lt;members&gt;Logos/sage&lt;/members&gt;&#10;&lt;/types&gt;&lt;types&gt;&lt;name&gt;ApexClass&lt;/name&gt;&lt;members&gt;Test&lt;/members&gt;&#10;&lt;/types&gt;"
+			outputList="documents/Logos-meta.xml&#10;documents/Logos/sage.jpg&#10;documents/Logos/sage.jpg-meta.xml&#10;classes/Test.cls&#10;classes/Test.cls-meta.xml&#10;"/>
+
+		<echo>Single QuickAction test</echo>
+		<testlist2xml input = "quickActions/Case.NewChildCase.quickAction"
+			outputXML="&lt;types&gt;&lt;name&gt;QuickAction&lt;/name&gt;&lt;members&gt;Case.NewChildCase&lt;/members&gt;&#10;&lt;/types&gt;"
+			outputList="quickActions/Case.NewChildCase.quickAction&#10;"/>
+	</target>
+
+	<macrodef name = "testlist2xml">
+		<attribute name = "input"/>
+		<attribute name = "outputXML"/>
+		<attribute name = "outputList"/>
+		<sequential>
+			<fileListToXML input = "@{input}"
+				xmlproperty = "xml"
+				listproperty = "list"/>
+			<assertequals a="${xml}" b="@{outputXML}"/>
+			<assertequals a="${list}" b="@{outputList}"/>
+		</sequential>
+	</macrodef>
+
+	<scriptdef name="assertequals"
+		language="javascript">
+		<attribute name="a"/>
+		<attribute name="b"/>
+		var a = attributes.get("a");
+		var b = attributes.get("b");
+		if (a!=b) print("FAIL: " + a + " : " + b + ";");
+	</scriptdef>
+</project>
